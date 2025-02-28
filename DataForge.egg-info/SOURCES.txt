@@ -1,0 +1,9 @@
+README.md
+setup.py
+DataForge/__init__.py
+DataForge/__main__.py
+DataForge.egg-info/PKG-INFO
+DataForge.egg-info/SOURCES.txt
+DataForge.egg-info/dependency_links.txt
+DataForge.egg-info/entry_points.txt
+DataForge.egg-info/top_level.txt

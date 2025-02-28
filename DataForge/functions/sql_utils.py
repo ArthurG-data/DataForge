@@ -1,12 +1,12 @@
 
 import os, asyncio
 
-from database_manager.scripts.postreg_get_database import initialise_db_connection
-from database_manager.functions.utils import fetch_all_cards
+from DataForge.scripts.postreg_get_database import initialise_db_connection
+from DataForge.functions.utils import fetch_all_cards
 
 '''
 --------------------------------------------------------------------------------------------------------------------------------------
-functions related to the main
+functions related to the main, arg from the cli
 --------------------------------------------------------------------------------------------------------------------------------------
 '''
 def get_last_id():
