@@ -1,6 +1,7 @@
-import aiohttp, asyncio, json, os
-from DataForge.functions.utils import get_header
+import aiohttp, json, os
+from DataForge.functions.utils import get_header, create_new_table
 from dotenv import load_dotenv
+from DataForge.scripts.pymongo_get_database import get_collection
 
 load_dotenv()
 PROJECT_ROOT = os.getenv("PROJECT_PATH")
@@ -33,7 +34,29 @@ async def import_file(url, destination):
         print(f"Error downloading from {url} to {destination}: {e}")
 
 
-destination = os.path.join(PROJECT_ROOT,"assets", "sets.json" )
-print(destination)
+def get_set_data():
+    collection = get_collection("sets")
+    data = collection.find({"digital":False}, {"_id":1, "code":1, "name":1, "release_at":1, "card_count":1,"icon_svg_uri":1 })
+    return list(data)
 
-asyncio.run(import_file(url, destination))
+def create_set_table(query):
+    try:
+        create_new_table(query)
+    except Exception as e:
+        print("Error creating the set table:", {e})
+
+def update_set_table():
+    
+query = """
+CREATE TABLE IF NOT EXISTS sets (
+    id varchar(38) PRIMARY KEY,
+    code varchar(5) UNIQUE,
+    name VARCHAR(100),
+    release_data DATE,
+    card_count INT,
+    icon_url TEXT
+);
+"""
+    
+
+create_set_table(query)
