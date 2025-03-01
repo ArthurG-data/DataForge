@@ -1,13 +1,13 @@
 
 from typing import Sequence, Optional
 from  argparse import ArgumentParser,RawDescriptionHelpFormatter
-from classes.classmodules import Args
+from DataForge.classes.classmodules import Args
 from tqdm.asyncio import tqdm
 from dotenv import load_dotenv, set_key
 from psycopg2.extras import execute_values
-from database_manager.scripts.postreg_get_database import initialise_db_connection
+from DataForge.scripts.postreg_get_database import initialise_db_connection
 
-import aiohttp, datetime, asyncio,  os, requests, time,  textwrap, psycopg2
+import aiohttp, datetime, asyncio,  os, requests, time,  textwrap, psycopg2, re
 
 '''
 --------------------------------------------------------------------------------------------------------------------------------------
@@ -22,13 +22,13 @@ def parse_args(argv:Optional[Sequence[str]]=None) -> Args:
     parser = ArgumentParser(prog="MTGstock Parser",
                                      formatter_class=RawDescriptionHelpFormatter,
                                      description=textwrap.dedent('''\
-                                        Table ID Creator - An Amazing Parser!
+                                        CLI for the DataForge Companion app!
                                         -------------------------------------
-                                        Interacts with the card_id database for the ebay_app.''')
+                                        Interacts with all the databases for the ebay_app.''')
                                      )
-    parser.add_argument("-l", "--last",  action="store_true", help="The last MTGstock id present in the table")
+    parser.add_argument("-l", "--last",choices=['t', "m"], help="The last MTGstock id present in the table on t or the valid for mtgstock on m")
     parser.add_argument("-c","--count", action="store_true", help="The number of card entry in the card_id table")
-    parser.add_argument("-u","--update",  action="store_true", help="Update the table with new entries, if the last valid online is different from the last in the table")
+    parser.add_argument("-u","--update", choices=["c", "s"], help="Update the table with new entries, if the last valid online is different from the last in the table")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-v", "--verbose", help="Prints more messages, useful for debugging", action="store_true")
     group.add_argument("-q", "--quiet", help="Remove the display of messages", action="store_true")
@@ -62,27 +62,42 @@ def create_new_table(query):
             cursor.close()
         if conn:
             conn.close()
-        
+
+def clean_card_name(card_name):
+    '''
+    require to remove name with info in ()
+    '''
+    return re.sub(r"\s*\(.*?\)", "", card_name).strip() 
+
 def insert_new_cards(cards_list):
     """
     function: creates a quesry to add a card to the card table
     inputs: List of tuples (mtg_stock_id, scry_id, TCG_id, card_name)
 
     """
+    #remove the none
+    cleaned_cards_list = [
+        (mtg_id, scry_id, tcg_id, clean_card_name(name)) 
+        for card in cards_list if card and len(card) == 4
+        for mtg_id, scry_id, tcg_id, name in [card]
+    ]
     query = """
     INSERT INTO card_id (mtg_stock_id, scry_id, TCG_id, card_name)
     VALUES %s
     ON CONFLICT (scry_id) DO NOTHING;
     """
-    print(f"Query to insert {len(cards_list)} new cards")
+    print(f"Query to insert {len(cleaned_cards_list)} new cards")
     try:
         conn, cursor = initialise_db_connection()
-        execute_values(cursor, query, cards_list)
+        execute_values(cursor, query, cleaned_cards_list)
         conn.commit()
-        print(f"Added {len(cards_list)} cards to the table")
+        print(f"Added {len(cleaned_cards_list)} cards to the table")
     except (Exception, psycopg2.DatabaseError) as error:
         conn.rollback()
         print(error)
+    finally:
+        cursor.close()
+        conn.close()
         
     
 '''
@@ -92,11 +107,13 @@ functions related making api calls
 '''
 # load env variable
 load_dotenv()
-SEMAPHORE = asyncio.Semaphore(2)
+SEMAPHORE = asyncio.Semaphore(10)
 SLEEP_TIME = 240
 #functions to import the data
 api_endpoint_finance = os.getenv(
     "API_MTGSTOCK_ENDPOINT")
+
+HOME_PATH = os.getenv("PROJECT_PATH")
 
 headers = {
 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
@@ -194,29 +211,49 @@ async def check_connection_status(session, unique_id):
     async with session.get(request_url, headers=get_header()) as response:
         return response.status == 200
 
-async def find_last_entry(start_index, end_index=1000000):
+async def find_last_entry(start_index, end_index=500000):
     """
     find the hisghest number and return it
     """
     low = start_index
     high = end_index
+    middle = None
     async with aiohttp.ClientSession() as session:
         while high > low:
             middle = (high+low) // 2
-            print(middle)
+            print(low, middle, high)
+            
             if await check_connection_status(session, middle):
                 low = middle+1
             else:
                 high = middle-1
-    return low
+            
+    return middle
 
 def update_env(key, id):
     """
-    change the higest  number
+    change the higest number env value
     """
-    dotenv_path = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..','..', '.env')) 
+    dotenv_path = os.path.join(HOME_PATH, ".env" )
     set_key(dotenv_path, key, str(id))
     print(f"Saved {key}={id} at {dotenv_path}" )
+
+
+def log_invalid_id(card_id):
+    """
+    log the id that were answered with a status other than 200 or 439 to a file
+    """
+    error_log_path = os.path.join(HOME_PATH ,"errors/invalid_id.txt")
+    try:
+        with open(error_log_path, "a+", encoding="utf-8") as f:
+            f.seek(0)
+            content = f.read().strip()
+            if content:
+                f.write(f" ,{card_id}")
+            else:
+                f.write(str(card_id))
+    except Exception as e:
+        print(f"Error writing to file: {e}")
 
 
 async def fetch_card(session,unique_id, queue, max_retries=3):
@@ -241,7 +278,8 @@ async def fetch_card(session,unique_id, queue, max_retries=3):
                         continue
                     else:
                         print(f"Request failed with status {response.status} for {unique_id}")
-                        await queue.put(1) 
+                        log_invalid_id(unique_id)
+                        await queue.put(1)
                         return None
 
             except aiohttp.ClientError as e:
@@ -277,6 +315,9 @@ async def batch_fetch_cards(id_start, id_end):
     return result
 
 def create_list_sql(cards):
+    '''
+    from the json response, create a list with the cards containing only the required values
+    '''
     cards_extracted = []
     for card in cards:
         cards_extracted.append(extract_params_prints_mtgstocks())
@@ -295,4 +336,9 @@ async def fetch_all_cards(first_entry, last_entry, step=100):
         insert_new_cards(cards_extracted)
         
         # Update first_entry to move to next batch
-        first_entry += step  
+        first_entry += step 
+
+def cleanup():
+    '''
+    will iterate
+    '''

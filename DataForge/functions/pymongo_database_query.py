@@ -1,4 +1,4 @@
-from pymongo_get_database import get_collection
+from DataForge.scripts.pymongo_get_database import get_collection
 from bson.objectid import ObjectId
 
 collection = get_collection()
