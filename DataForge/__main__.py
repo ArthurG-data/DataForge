@@ -1,6 +1,6 @@
 
 from DataForge.functions.utils import sigterm_handler, parse_args
-from DataForge.functions.sql_utils import update_table_id, get_number_row, get_last_id
+from DataForge.functions.sql_utils import update_table_id, get_number_row, get_last_id, get_last_valide_index, update_sets
 from DataForge.classes.classmodules import Args
 from dotenv import load_dotenv
 from signal import signal, SIGTERM
@@ -11,11 +11,13 @@ def main(args : Args):
     if args.update == "c":
        update_table_id(args.x)
     if args.update == "s":
-        print("To impplement")
+        update_sets()
     if args.count:
         get_number_row()
-    if args.last:
+    if args.last == "t":
         get_last_id()
+    if args.last == "m":
+        get_last_valide_index()
     
 def run_cli():
     """Entry point for the command-line tool."""

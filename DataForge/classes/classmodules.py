@@ -4,7 +4,7 @@ class Args(NamedTuple):
     '''
     a class to pass the arg of the cli to the main function
     '''
-    last: Optional[int]
+    last: Optional[str]
     count: bool
     update: Optional[str]
     verbose: bool

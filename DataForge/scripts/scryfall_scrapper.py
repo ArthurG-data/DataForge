@@ -1,13 +1,9 @@
-import aiohttp, json, os
+import aiohttp, json
 from DataForge.functions.utils import get_header, create_new_table
-from dotenv import load_dotenv
+from psycopg2.extras import execute_values
 from DataForge.scripts.pymongo_get_database import get_collection
+from DataForge.scripts.postreg_get_database import initialise_db_connection
 
-load_dotenv()
-PROJECT_ROOT = os.getenv("PROJECT_PATH")
-
-
-url = "https://api.scryfall.com/sets"
 
 async def download_file(url):
     async with aiohttp.ClientSession() as session:
@@ -45,18 +41,35 @@ def create_set_table(query):
     except Exception as e:
         print("Error creating the set table:", {e})
 
-def update_set_table():
-    
-query = """
-CREATE TABLE IF NOT EXISTS sets (
-    id varchar(38) PRIMARY KEY,
-    code varchar(5) UNIQUE,
-    name VARCHAR(100),
-    release_data DATE,
-    card_count INT,
-    icon_url TEXT
-);
-"""
-    
+def migrate_mongo_to_postgres():
+    """
+    migrate the set symbols from mongoDB set to sql
+    """
 
-create_set_table(query)
+    collection = get_collection('sets')
+    mongo_data = collection.find(
+            {"digital": False},  # Filtering condition
+        {"_id": 1, "code": 1, "name": 1, "released_at": 1, "card_count": 1, "icon_svg_uri": 1}  # Fields to extract
+    )
+
+    conn, cursor = initialise_db_connection()
+    INSERT_QUERY = """
+    INSERT INTO sets (id, code, name, release_data, card_count, icon_url)
+    VALUES %s
+    ON CONFLICT (id) DO NOTHING;
+    """
+    list_data = list(mongo_data)
+    rows = [(str(item["_id"]), item["code"], item["name"], item["released_at"], item.get("card_count", 0), item["icon_svg_uri"])
+            for item in list_data]
+    try:
+        execute_values(cursor, INSERT_QUERY, rows)
+        conn.commit()
+
+        print(f"Number of sets added: {len(rows)}")
+    except Exception as e:
+        print("Could not update sets table:", e)
+    finally:
+        cursor.close()
+        conn.close()
+
+

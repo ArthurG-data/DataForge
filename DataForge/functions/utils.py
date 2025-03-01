@@ -26,7 +26,7 @@ def parse_args(argv:Optional[Sequence[str]]=None) -> Args:
                                         -------------------------------------
                                         Interacts with all the databases for the ebay_app.''')
                                      )
-    parser.add_argument("-l", "--last",  action="store_true", help="The last MTGstock id present in the table")
+    parser.add_argument("-l", "--last",  default="t",choices=['t', "m"], help="The last MTGstock id present in the table on t or the valid for mtgstock on m")
     parser.add_argument("-c","--count", action="store_true", help="The number of card entry in the card_id table")
     parser.add_argument("-u","--update", choices=["c", "s"], help="Update the table with new entries, if the last valid online is different from the last in the table")
     group = parser.add_mutually_exclusive_group()
@@ -107,7 +107,7 @@ functions related making api calls
 '''
 # load env variable
 load_dotenv()
-SEMAPHORE = asyncio.Semaphore(2)
+SEMAPHORE = asyncio.Semaphore(10)
 SLEEP_TIME = 240
 #functions to import the data
 api_endpoint_finance = os.getenv(
@@ -211,27 +211,30 @@ async def check_connection_status(session, unique_id):
     async with session.get(request_url, headers=get_header()) as response:
         return response.status == 200
 
-async def find_last_entry(start_index, end_index=1000000):
+async def find_last_entry(start_index, end_index=500000):
     """
     find the hisghest number and return it
     """
     low = start_index
     high = end_index
+    middle = None
     async with aiohttp.ClientSession() as session:
         while high > low:
             middle = (high+low) // 2
-            print(middle)
+            print(low, middle, high)
+            
             if await check_connection_status(session, middle):
                 low = middle+1
             else:
                 high = middle-1
-    return low
+            
+    return middle
 
 def update_env(key, id):
     """
     change the higest number env value
     """
-    dotenv_path = HOME_PATH / ".env" 
+    dotenv_path = os.path.join(HOME_PATH, ".env" )
     set_key(dotenv_path, key, str(id))
     print(f"Saved {key}={id} at {dotenv_path}" )
 
@@ -240,7 +243,7 @@ def log_invalid_id(card_id):
     """
     log the id that were answered with a status other than 200 or 439 to a file
     """
-    error_log_path = HOME_PATH / "errors/invalid_id.txt"
+    error_log_path = os.path.join(HOME_PATH ,"errors/invalid_id.txt")
     try:
         with open(error_log_path, "a+", encoding="utf-8") as f:
             f.seek(0)
