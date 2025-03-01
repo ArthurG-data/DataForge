@@ -1,2 +1,0 @@
-[console_scripts]
-DataForge = DataForge.__main__:run_cli
