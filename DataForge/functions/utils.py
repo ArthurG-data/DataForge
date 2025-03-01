@@ -26,7 +26,7 @@ def parse_args(argv:Optional[Sequence[str]]=None) -> Args:
                                         -------------------------------------
                                         Interacts with all the databases for the ebay_app.''')
                                      )
-    parser.add_argument("-l", "--last",  default="t",choices=['t', "m"], help="The last MTGstock id present in the table on t or the valid for mtgstock on m")
+    parser.add_argument("-l", "--last",choices=['t', "m"], help="The last MTGstock id present in the table on t or the valid for mtgstock on m")
     parser.add_argument("-c","--count", action="store_true", help="The number of card entry in the card_id table")
     parser.add_argument("-u","--update", choices=["c", "s"], help="Update the table with new entries, if the last valid online is different from the last in the table")
     group = parser.add_mutually_exclusive_group()

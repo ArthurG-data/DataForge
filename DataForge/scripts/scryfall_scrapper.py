@@ -10,7 +10,6 @@ async def download_file(url):
         async with session.get(url, headers=get_header())  as response:
             if response.status == 200:
                 response = await response.json()
-                print(response)
                 return response["data"]
             else:
                 raise Exception(f"Error wihle downloading set database, {response.status}")
@@ -25,6 +24,7 @@ async def import_file(url, destination):
             json.dump(json_file, f, indent=4)
 
         print(f"File {destination} successfully replaced with new data")
+        return json_file
 
     except Exception as e:
         print(f"Error downloading from {url} to {destination}: {e}")
