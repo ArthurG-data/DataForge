@@ -1,9 +1,17 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
+
+def read_requirements():
+    with open("requirements.txt", "r") as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
 
 setup(
     name='DataForge',
-    version = '0.1.0',
-    packages=['DataForge'],
+    version = '0.2.0',
+    packages=find_packages(),
+    install_requires=read_requirements(),
+    include_package_data=True,
     entry_points = {
         'console_scripts': [
             'DataForge = DataForge.__main__:run_cli'
@@ -18,5 +26,5 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.11.5',  # Adjust as needed
+    python_requires='>=3.11.5', 
 )
