@@ -22,8 +22,7 @@ def initialise_db_connection():
     """
     conn = psycopg2.connect(
     get_postgres_params())
-    cursor = conn.cursor()
-    return conn, cursor
+    return conn
 
 if __name__=="__main__":
     conn, cursor = initialise_db_connection()

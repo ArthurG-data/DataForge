@@ -12,6 +12,27 @@ load_dotenv()
 functions related to the main, arg from the cli
 --------------------------------------------------------------------------------------------------------------------------------------
 '''
+def execute_query(query, connection, verbose=False):
+    cursor = connection.cursor()
+    try:
+        cursor.execute(query)
+        print('Query successfuly executed')
+    except Exception as e:
+        print('Error executing quey: ', e)
+        connection.rollback()
+    finally:
+        cursor.close()
+    
+def execute_many_query(query, data, connection):
+    cursor = connection.cursor()
+    try:
+        cursor.executemany(query, data,)
+    except Exception as e:
+        print('Error executing many querie:', e)
+        connection.rollback()
+    finally:
+        cursor.close()
+    
 def get_last_id():
     print("Selecting last mtgstock id in the table:")
     conn, cursor = initialise_db_connection()   
